@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-namespace lw {
+namespace ak {
 
 struct Preset {
   std::string name;
@@ -15,4 +15,4 @@ struct Preset {
 const std::vector<Preset>& builtinPresets();
 Params presetParams(size_t index); // defaults + the preset's values
 
-} // namespace lw
+} // namespace ak

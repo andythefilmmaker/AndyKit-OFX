@@ -1,4 +1,4 @@
-// Linework — host-independent rendering engine.
+// AndyKit — host-independent rendering engine.
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "Params.h"
@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace lw {
+namespace ak {
 
 // RGBA float image, rows top-to-bottom, 4 floats per pixel.
 struct Image {
@@ -36,7 +36,7 @@ struct HistoryFrame {
 struct RenderInfo {
   double seconds = 0;          // current time in seconds
   int frame = 0;               // current frame number
-  std::string title = "LINEWORK";
+  std::string title = "ANDYKIT";
 };
 
 // Renders the effect in place on `img` (which holds the source frame).
@@ -44,4 +44,4 @@ struct RenderInfo {
 void render(Image& img, const Analysis& current, const std::vector<HistoryFrame>& history,
             const Params& p, const RenderInfo& info);
 
-} // namespace lw
+} // namespace ak

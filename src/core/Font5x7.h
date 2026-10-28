@@ -3,7 +3,7 @@
 #pragma once
 #include <cstdint>
 
-namespace lw {
+namespace ak {
 
 // Each glyph: 7 rows, lowest 5 bits used, bit 4 = leftmost pixel.
 inline const uint8_t* glyph5x7(char c) {
@@ -46,4 +46,4 @@ inline const uint8_t* glyph5x7(char c) {
   }
 }
 
-} // namespace lw
+} // namespace ak

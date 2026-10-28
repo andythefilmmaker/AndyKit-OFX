@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Presets.h"
 
-namespace lw {
+namespace ak {
 
 const std::vector<Preset>& builtinPresets() {
   static const std::vector<Preset> presets = {
@@ -23,4 +23,4 @@ Params presetParams(size_t index) {
   return p;
 }
 
-} // namespace lw
+} // namespace ak

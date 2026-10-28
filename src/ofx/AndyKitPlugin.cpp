@@ -1,4 +1,4 @@
-// Linework — OpenFX plugin wrapper around the host-independent engine.
+// AndyKit — OpenFX plugin wrapper around the host-independent engine.
 // SPDX-License-Identifier: MIT
 #include "ofxsImageEffect.h"
 #include "ofxsMultiThread.h"
@@ -13,18 +13,18 @@
 #include <mutex>
 #include <string>
 
-#define kPluginName        "Linework"
+#define kPluginName        "AndyKit"
 #define kPluginGrouping    "ANDYTHEFILMMAKER"
 #define kPluginDescription "Turns edges into points, shapes and lines with temporal pixel memory, contours, dither and glitch. Open source."
-#define kPluginIdentifier  "com.andythefilmmaker.linework"
-#ifndef LW_VERSION_MAJOR
-#define LW_VERSION_MAJOR 0
-#define LW_VERSION_MINOR 1
+#define kPluginIdentifier  "com.andythefilmmaker.andykit"
+#ifndef AK_VERSION_MAJOR
+#define AK_VERSION_MAJOR 0
+#define AK_VERSION_MINOR 1
 #endif
 
-#define kParamPresetChoice "lwPreset"
-#define kParamPresetApply  "lwPresetApply"
-#define kParamTitle        "lwTitle"
+#define kParamPresetChoice "akPreset"
+#define kParamPresetApply  "akPresetApply"
+#define kParamTitle        "akTitle"
 
 using namespace OFX;
 
@@ -33,13 +33,13 @@ namespace {
 // Analyses of source frames, reused across renders (pixel memory replays earlier frames).
 class AnalysisCache {
  public:
-  std::shared_ptr<const lw::Analysis> get(double t, int w, int h) {
+  std::shared_ptr<const ak::Analysis> get(double t, int w, int h) {
     std::lock_guard<std::mutex> lk(m_);
     auto it = map_.find(t);
     if (it != map_.end() && it->second.w == w && it->second.h == h) return it->second.a;
     return nullptr;
   }
-  void put(double t, int w, int h, std::shared_ptr<const lw::Analysis> a) {
+  void put(double t, int w, int h, std::shared_ptr<const ak::Analysis> a) {
     std::lock_guard<std::mutex> lk(m_);
     if (map_.size() > 160) map_.clear();
     map_[t] = {w, h, std::move(a)};
@@ -47,13 +47,13 @@ class AnalysisCache {
   void clear() { std::lock_guard<std::mutex> lk(m_); map_.clear(); }
 
  private:
-  struct Entry { int w, h; std::shared_ptr<const lw::Analysis> a; };
+  struct Entry { int w, h; std::shared_ptr<const ak::Analysis> a; };
   std::mutex m_;
   std::map<double, Entry> map_;
 };
 
-// Copies an OFX RGBA float image (bottom-up rows) into a top-down lw::Image.
-bool toEngineImage(const Image& src, lw::Image& out) {
+// Copies an OFX RGBA float image (bottom-up rows) into a top-down ak::Image.
+bool toEngineImage(const Image& src, ak::Image& out) {
   if (src.getPixelDepth() != eBitDepthFloat || src.getPixelComponents() != ePixelComponentRGBA) return false;
   const OfxRectI& b = src.getBounds();
   int w = b.x2 - b.x1, h = b.y2 - b.y1;
@@ -73,19 +73,19 @@ bool toEngineImage(const Image& src, lw::Image& out) {
 
 } // namespace
 
-class LineworkPlugin : public ImageEffect {
+class AndyKitPlugin : public ImageEffect {
  public:
-  explicit LineworkPlugin(OfxImageEffectHandle handle) : ImageEffect(handle) {
+  explicit AndyKitPlugin(OfxImageEffectHandle handle) : ImageEffect(handle) {
     dstClip_ = fetchClip(kOfxImageEffectOutputClipName);
     srcClip_ = getContext() == eContextGenerator ? nullptr : fetchClip(kOfxImageEffectSimpleSourceClipName);
     presetChoice_ = fetchChoiceParam(kParamPresetChoice);
     title_ = fetchStringParam(kParamTitle);
-    for (const auto& s : lw::paramSpecs()) {
+    for (const auto& s : ak::paramSpecs()) {
       switch (s.type) {
-        case lw::PType::Double: doubles_[s.id] = fetchDoubleParam(s.id); break;
-        case lw::PType::Int:    ints_[s.id] = fetchIntParam(s.id); break;
-        case lw::PType::Bool:   bools_[s.id] = fetchBooleanParam(s.id); break;
-        case lw::PType::Choice: choices_[s.id] = fetchChoiceParam(s.id); break;
+        case ak::PType::Double: doubles_[s.id] = fetchDoubleParam(s.id); break;
+        case ak::PType::Int:    ints_[s.id] = fetchIntParam(s.id); break;
+        case ak::PType::Bool:   bools_[s.id] = fetchBooleanParam(s.id); break;
+        case ak::PType::Choice: choices_[s.id] = fetchChoiceParam(s.id); break;
       }
     }
   }
@@ -98,16 +98,16 @@ class LineworkPlugin : public ImageEffect {
     if (dst->getPixelDepth() != eBitDepthFloat || dst->getPixelComponents() != ePixelComponentRGBA)
       throwSuiteStatusException(kOfxStatErrUnsupported);
 
-    lw::Image frame;
+    ak::Image frame;
     if (!toEngineImage(*src, frame)) throwSuiteStatusException(kOfxStatErrUnsupported);
     const OfxRectI sb = src->getBounds();
 
-    lw::Params p = readParams(args.time);
+    ak::Params p = readParams(args.time);
     auto current = analysisAt(args.time, frame);
 
     // Earlier frames for pixel memory (deterministic: each render replays its own warm-up).
-    std::vector<std::shared_ptr<const lw::Analysis>> keep;
-    std::vector<lw::HistoryFrame> history;
+    std::vector<std::shared_ptr<const ak::Analysis>> keep;
+    std::vector<ak::HistoryFrame> history;
     double fps = srcClip_->getFrameRate();
     if (fps <= 0) fps = 24;
     if (p.pixelMemory >= 0.5 && p.pixelMemoryWarmup > 0 && !abort()) {
@@ -123,14 +123,14 @@ class LineworkPlugin : public ImageEffect {
       }
     }
 
-    lw::RenderInfo info;
+    ak::RenderInfo info;
     info.frame = int(std::floor(args.time));
     info.seconds = args.time / fps;
     std::string title;
     title_->getValueAtTime(args.time, title);
-    info.title = title.empty() ? "LINEWORK" : title;
+    info.title = title.empty() ? "ANDYKIT" : title;
 
-    lw::render(frame, *current, history, p, info);
+    ak::render(frame, *current, history, p, info);
 
     // Write back the render window (top-down engine rows -> bottom-up OFX rows).
     const OfxRectI& rw = args.renderWindow;
@@ -161,15 +161,15 @@ class LineworkPlugin : public ImageEffect {
     if (name == kParamPresetApply) {
       int idx = 0;
       presetChoice_->getValue(idx);
-      lw::Params p = lw::presetParams(size_t(std::max(0, idx)));
-      beginEditBlock("Apply Linework preset");
-      for (const auto& s : lw::paramSpecs()) {
+      ak::Params p = ak::presetParams(size_t(std::max(0, idx)));
+      beginEditBlock("Apply AndyKit preset");
+      for (const auto& s : ak::paramSpecs()) {
         double v = valueOf(p, s.id);
         switch (s.type) {
-          case lw::PType::Double: doubles_[s.id]->setValue(v); break;
-          case lw::PType::Int:    ints_[s.id]->setValue(int(std::lround(v))); break;
-          case lw::PType::Bool:   bools_[s.id]->setValue(v >= 0.5); break;
-          case lw::PType::Choice: choices_[s.id]->setValue(int(std::lround(v))); break;
+          case ak::PType::Double: doubles_[s.id]->setValue(v); break;
+          case ak::PType::Int:    ints_[s.id]->setValue(int(std::lround(v))); break;
+          case ak::PType::Bool:   bools_[s.id]->setValue(v >= 0.5); break;
+          case ak::PType::Choice: choices_[s.id]->setValue(int(std::lround(v))); break;
         }
       }
       endEditBlock();
@@ -179,15 +179,15 @@ class LineworkPlugin : public ImageEffect {
   void changedClip(const InstanceChangedArgs&, const std::string&) override { cache_.clear(); }
 
  private:
-  static double valueOf(const lw::Params& p, const std::string& id) {
-#define LW_X(pid, label, group, type, def, mn, mx, choices) if (id == #pid) return p.pid;
-    LW_PARAM_LIST(LW_X)
-#undef LW_X
+  static double valueOf(const ak::Params& p, const std::string& id) {
+#define AK_X(pid, label, group, type, def, mn, mx, choices) if (id == #pid) return p.pid;
+    AK_PARAM_LIST(AK_X)
+#undef AK_X
     return 0;
   }
 
-  lw::Params readParams(double t) {
-    lw::Params p;
+  ak::Params readParams(double t) {
+    ak::Params p;
     for (auto& kv : doubles_) { double v; kv.second->getValueAtTime(t, v); p.set(kv.first, v); }
     for (auto& kv : ints_)    { int v;    kv.second->getValueAtTime(t, v); p.set(kv.first, v); }
     for (auto& kv : bools_)   { bool v;   kv.second->getValueAtTime(t, v); p.set(kv.first, v ? 1 : 0); }
@@ -195,20 +195,20 @@ class LineworkPlugin : public ImageEffect {
     return p;
   }
 
-  std::shared_ptr<const lw::Analysis> analysisAt(double t, const lw::Image& img) {
+  std::shared_ptr<const ak::Analysis> analysisAt(double t, const ak::Image& img) {
     if (auto a = cache_.get(t, img.w, img.h)) return a;
-    auto a = std::make_shared<const lw::Analysis>(lw::analyze(img));
+    auto a = std::make_shared<const ak::Analysis>(ak::analyze(img));
     cache_.put(t, img.w, img.h, a);
     return a;
   }
 
-  std::shared_ptr<const lw::Analysis> cachedOrFetch(double t, int w, int h) {
+  std::shared_ptr<const ak::Analysis> cachedOrFetch(double t, int w, int h) {
     if (auto a = cache_.get(t, w, h)) return a;
     std::unique_ptr<const Image> im(srcClip_->fetchImage(t));
     if (!im) return nullptr;
-    lw::Image tmp;
+    ak::Image tmp;
     if (!toEngineImage(*im, tmp) || tmp.w != w || tmp.h != h) return nullptr;
-    auto a = std::make_shared<const lw::Analysis>(lw::analyze(tmp));
+    auto a = std::make_shared<const ak::Analysis>(ak::analyze(tmp));
     cache_.put(t, w, h, a);
     return a;
   }
@@ -224,9 +224,9 @@ class LineworkPlugin : public ImageEffect {
   AnalysisCache cache_;
 };
 
-mDeclarePluginFactory(LineworkPluginFactory, {}, {});
+mDeclarePluginFactory(AndyKitPluginFactory, {}, {});
 
-void LineworkPluginFactory::describe(ImageEffectDescriptor& desc) {
+void AndyKitPluginFactory::describe(ImageEffectDescriptor& desc) {
   desc.setLabels(kPluginName, kPluginName, kPluginName);
   desc.setPluginGrouping(kPluginGrouping);
   desc.setPluginDescription(kPluginDescription);
@@ -243,7 +243,7 @@ void LineworkPluginFactory::describe(ImageEffectDescriptor& desc) {
   desc.setRenderThreadSafety(eRenderInstanceSafe);
 }
 
-void LineworkPluginFactory::describeInContext(ImageEffectDescriptor& desc, ContextEnum) {
+void AndyKitPluginFactory::describeInContext(ImageEffectDescriptor& desc, ContextEnum) {
   ClipDescriptor* src = desc.defineClip(kOfxImageEffectSimpleSourceClipName);
   src->addSupportedComponent(ePixelComponentRGBA);
   src->setTemporalClipAccess(true);
@@ -263,7 +263,7 @@ void LineworkPluginFactory::describeInContext(ImageEffectDescriptor& desc, Conte
   ChoiceParamDescriptor* pc = desc.defineChoiceParam(kParamPresetChoice);
   pc->setLabels("Preset", "Preset", "Preset");
   pc->setHint("Choose a look, then press Apply Preset.");
-  for (const auto& pr : lw::builtinPresets()) pc->appendOption(pr.name);
+  for (const auto& pr : ak::builtinPresets()) pc->appendOption(pr.name);
   pc->setDefault(0);
   pc->setAnimates(false);
   pc->setParent(*presetGroup);
@@ -275,14 +275,14 @@ void LineworkPluginFactory::describeInContext(ImageEffectDescriptor& desc, Conte
   StringParamDescriptor* title = desc.defineStringParam(kParamTitle);
   title->setLabels("Frame Title", "Frame Title", "Frame Title");
   title->setHint("Text shown in the artwork frame when Labels is on.");
-  title->setDefault("LINEWORK");
+  title->setDefault("ANDYKIT");
   title->setStringType(eStringTypeSingleLine);
   title->setAnimates(false);
   title->setParent(*presetGroup);
   page->addChild(*title);
 
   std::map<std::string, GroupParamDescriptor*> groups;
-  for (const auto& s : lw::paramSpecs()) {
+  for (const auto& s : ak::paramSpecs()) {
     GroupParamDescriptor*& g = groups[s.group];
     if (!g) {
       std::string gid = std::string("grp") + s.group;
@@ -294,7 +294,7 @@ void LineworkPluginFactory::describeInContext(ImageEffectDescriptor& desc, Conte
     }
     ParamDescriptor* pd = nullptr;
     switch (s.type) {
-      case lw::PType::Double: {
+      case ak::PType::Double: {
         DoubleParamDescriptor* d = desc.defineDoubleParam(s.id);
         d->setDefault(s.def);
         d->setRange(s.min, s.max);
@@ -304,7 +304,7 @@ void LineworkPluginFactory::describeInContext(ImageEffectDescriptor& desc, Conte
         pd = d;
         break;
       }
-      case lw::PType::Int: {
+      case ak::PType::Int: {
         IntParamDescriptor* d = desc.defineIntParam(s.id);
         d->setDefault(int(s.def));
         d->setRange(int(s.min), int(s.max));
@@ -312,14 +312,14 @@ void LineworkPluginFactory::describeInContext(ImageEffectDescriptor& desc, Conte
         pd = d;
         break;
       }
-      case lw::PType::Bool: {
+      case ak::PType::Bool: {
         BooleanParamDescriptor* d = desc.defineBooleanParam(s.id);
         d->setDefault(s.def >= 0.5);
         d->setAnimates(true);
         pd = d;
         break;
       }
-      case lw::PType::Choice: {
+      case ak::PType::Choice: {
         ChoiceParamDescriptor* d = desc.defineChoiceParam(s.id);
         for (const auto& o : *s.choices) d->appendOption(o);
         d->setDefault(int(s.def));
@@ -333,14 +333,14 @@ void LineworkPluginFactory::describeInContext(ImageEffectDescriptor& desc, Conte
   }
 }
 
-ImageEffect* LineworkPluginFactory::createInstance(OfxImageEffectHandle handle, ContextEnum) {
-  return new LineworkPlugin(handle);
+ImageEffect* AndyKitPluginFactory::createInstance(OfxImageEffectHandle handle, ContextEnum) {
+  return new AndyKitPlugin(handle);
 }
 
 namespace OFX {
 namespace Plugin {
 void getPluginIDs(PluginFactoryArray& ids) {
-  static LineworkPluginFactory p(kPluginIdentifier, LW_VERSION_MAJOR, LW_VERSION_MINOR);
+  static AndyKitPluginFactory p(kPluginIdentifier, AK_VERSION_MAJOR, AK_VERSION_MINOR);
   ids.push_back(&p);
 }
 } // namespace Plugin

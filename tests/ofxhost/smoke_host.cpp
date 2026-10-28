@@ -1,4 +1,4 @@
-// Minimal OpenFX host used to smoke-test the Linework bundle without an editing app.
+// Minimal OpenFX host used to smoke-test the AndyKit bundle without an editing app.
 //   smoke_host <plugin-dir> <input.png> <out-prefix> [--frames N] [--start S] [--preset index] [param=value ...]
 // Derived from the OpenFX HostSupport demo.
 // Copyright OpenFX and contributors to the OpenFX project.
@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
     else if (a == "--start" && i + 1 < argc) start = std::atoi(argv[++i]);
     else if (auto eq = a.find('='); eq != std::string::npos) MyHost::paramOverrides()[a.substr(0, eq)] = a.substr(eq + 1);
   }
-  if (preset >= 0) MyHost::paramOverrides()["lwPreset"] = std::to_string(preset);
+  if (preset >= 0) MyHost::paramOverrides()["akPreset"] = std::to_string(preset);
 
   int w, h, n;
   unsigned char* data = stbi_load(input.c_str(), &w, &h, &n, 4);
@@ -60,15 +60,15 @@ int main(int argc, char** argv) {
     for (int x = 0; x < w * 4; ++x) S.rgba[size_t(h - 1 - y) * w * 4 + x] = data[size_t(y) * w * 4 + x] / 255.f;
   stbi_image_free(data);
 
-  OFX::Host::PluginCache::getPluginCache()->setCacheVersion("lwSmokeV1");
+  OFX::Host::PluginCache::getPluginCache()->setCacheVersion("akSmokeV1");
   OFX::Host::PluginCache::getPluginCache()->addFileToPath(pluginDir);
   MyHost::Host host;
   OFX::Host::ImageEffect::PluginCache cache(host);
   cache.registerInCache(*OFX::Host::PluginCache::getPluginCache());
   OFX::Host::PluginCache::getPluginCache()->scanPluginFiles();
 
-  OFX::Host::ImageEffect::ImageEffectPlugin* plugin = cache.getPluginById("com.andythefilmmaker.linework");
-  if (!plugin) return fail("plugin com.andythefilmmaker.linework not found in " + pluginDir);
+  OFX::Host::ImageEffect::ImageEffectPlugin* plugin = cache.getPluginById("com.andythefilmmaker.andykit");
+  if (!plugin) return fail("plugin com.andythefilmmaker.andykit not found in " + pluginDir);
   std::cout << "loaded: " << plugin->getDescriptor().getLabel() << " v" << plugin->getVersionMajor() << "." << plugin->getVersionMinor() << std::endl;
 
   std::unique_ptr<OFX::Host::ImageEffect::Instance> inst(plugin->createInstance(kOfxImageEffectContextFilter, nullptr));
@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
   OfxPointD scale{1.0, 1.0};
   if (preset >= 0) { // press "Apply Preset" like a user would
     inst->beginInstanceChangedAction(kOfxChangeUserEdited);
-    st = inst->paramInstanceChangedAction("lwPresetApply", kOfxChangeUserEdited, 0, scale);
+    st = inst->paramInstanceChangedAction("akPresetApply", kOfxChangeUserEdited, 0, scale);
     inst->endInstanceChangedAction(kOfxChangeUserEdited);
     if (st != kOfxStatOK && st != kOfxStatReplyDefault) return fail("apply preset");
     std::cout << "preset " << preset << " applied" << std::endl;

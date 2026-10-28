@@ -1,8 +1,8 @@
-# Linework
+# AndyKit
 
 **Open source OpenFX plugin for DaVinci Resolve Studio** that turns the edges of your footage into points, shapes and lines — with temporal pixel memory, contour fields, dither print, glitch and a beat pulse.
 
-![Linework looks](docs/preview.jpg)
+![AndyKit looks](docs/preview.jpg)
 
 *Andy Lines · Andy Lines Gray · Andy Circles · Andy Dither*
 
@@ -15,15 +15,15 @@
 
 Download the zip for your system from [Releases](../../releases), then follow [`docs/INSTALL.txt`](docs/INSTALL.txt):
 
-| System  | Copy `Linework.ofx.bundle` to          |
+| System  | Copy `AndyKit.ofx.bundle` to          |
 |---------|----------------------------------------|
 | macOS   | `/Library/OFX/Plugins/`                |
 | Windows | `C:\Program Files\Common Files\OFX\Plugins\` |
 | Linux   | `/usr/OFX/Plugins/`                    |
 
-On macOS run once: `sudo xattr -dr com.apple.quarantine /Library/OFX/Plugins/Linework.ofx.bundle`
+On macOS run once: `sudo xattr -dr com.apple.quarantine /Library/OFX/Plugins/AndyKit.ofx.bundle`
 
-In Resolve: **Effects → OpenFX → Filters → ANDYTHEFILMMAKER → Linework**.
+In Resolve: **Effects → OpenFX → Filters → ANDYTHEFILMMAKER → AndyKit**.
 
 ## What it does
 
@@ -47,7 +47,7 @@ Requirements: CMake ≥ 3.20 and a C++17 compiler. The OpenFX SDK (1.5.1) and st
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
-# → build/bundle/Linework.ofx.bundle
+# → build/bundle/AndyKit.ofx.bundle
 ```
 
 macOS universal: add `-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"`.
@@ -56,9 +56,9 @@ macOS universal: add `-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"`.
 
 ```sh
 # render the engine on a still (12 frames so motion and memory evolve)
-./build/lw_render tests/assets/portrait.png out.png --preset "Andy Circles" --frames 12 density=80
+./build/ak_render tests/assets/portrait.png out.png --preset "Andy Circles" --frames 12 density=80
 
-# load the real plugin bundle in a minimal OpenFX host (needs expat): -DLW_BUILD_TESTS=ON
+# load the real plugin bundle in a minimal OpenFX host (needs expat): -DAK_BUILD_TESTS=ON
 ./build/smoke_host build/bundle tests/assets/portrait.png out --frames 4 --preset 2
 ```
 
@@ -67,11 +67,11 @@ macOS universal: add `-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"`.
 ```
 src/core/     engine — no OpenFX dependency (analysis, drawing, layers, presets)
 src/ofx/      OpenFX plugin wrapper
-tools/        lw_render command-line renderer
+tools/        ak_render command-line renderer
 tests/ofxhost minimal OpenFX host for CI smoke tests
 ```
 
-Parameters are declared once in `src/core/Params.h` (`LW_PARAM_LIST`) and drive the engine, the plugin UI and the CLI.
+Parameters are declared once in `src/core/Params.h` (`AK_PARAM_LIST`) and drive the engine, the plugin UI and the CLI.
 
 ## Roadmap
 
@@ -89,4 +89,4 @@ Uses the [OpenFX SDK](https://github.com/AcademySoftwareFoundation/openfx) (BSD-
 
 ### In italiano
 
-Linework è un plugin OpenFX gratuito e open source per DaVinci Resolve Studio: trasforma i bordi del girato in punti, forme e linee, con memoria dei pixel, contour, dither, glitch e pulsazione a tempo. Si installa copiando `Linework.ofx.bundle` nella cartella dei plugin OFX (vedi tabella sopra) e si trova in **Effects → OpenFX → ANDYTHEFILMMAKER → Linework**.
+AndyKit è un plugin OpenFX gratuito e open source per DaVinci Resolve Studio: trasforma i bordi del girato in punti, forme e linee, con memoria dei pixel, contour, dither, glitch e pulsazione a tempo. Si installa copiando `AndyKit.ofx.bundle` nella cartella dei plugin OFX (vedi tabella sopra) e si trova in **Effects → OpenFX → ANDYTHEFILMMAKER → AndyKit**.

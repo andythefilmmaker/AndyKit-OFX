@@ -1,10 +1,10 @@
-// Linework — parameter table shared by the engine, the OFX plugin and the CLI.
+// AndyKit — parameter table shared by the engine, the OFX plugin and the CLI.
 // SPDX-License-Identifier: MIT
 #pragma once
 #include <string>
 #include <vector>
 
-namespace lw {
+namespace ak {
 
 enum class PType { Double, Int, Bool, Choice };
 
@@ -22,7 +22,7 @@ inline const std::vector<std::string> kContourStyles= {"Topographic", "Flow"};
 inline const std::vector<std::string> kDitherAlgos  = {"Atkinson", "Floyd-Steinberg", "Bayer"};
 
 // X-macro: id, label, group, type, default, min, max, choices (nullptr if none)
-#define LW_PARAM_LIST(X) \
+#define AK_PARAM_LIST(X) \
   /* General */ \
   X(seed,               "Seed",                 "General",      Int,    426,  1,   9999, nullptr) \
   X(colorMode,          "Color Mode",           "General",      Choice, 0,    0,   4,    &kColorModes) \
@@ -105,9 +105,9 @@ inline const std::vector<std::string> kDitherAlgos  = {"Atkinson", "Floyd-Steinb
   X(highGain,           "Glitch Pulse",         "Rhythm",       Double, 54,   0,   150,  nullptr)
 
 struct Params {
-#define LW_X(id, label, group, type, def, mn, mx, choices) double id = def;
-  LW_PARAM_LIST(LW_X)
-#undef LW_X
+#define AK_X(id, label, group, type, def, mn, mx, choices) double id = def;
+  AK_PARAM_LIST(AK_X)
+#undef AK_X
   bool set(const std::string& key, double v);
 };
 
@@ -125,4 +125,4 @@ const ParamSpec* findSpec(const std::string& id);
 // Sets a value from text: numbers, true/false, or a choice label (case-insensitive).
 bool setFromText(Params& p, const std::string& key, const std::string& value);
 
-} // namespace lw
+} // namespace ak

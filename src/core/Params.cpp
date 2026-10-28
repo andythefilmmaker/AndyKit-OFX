@@ -4,13 +4,13 @@
 #include <cctype>
 #include <cstdlib>
 
-namespace lw {
+namespace ak {
 
 const std::vector<ParamSpec>& paramSpecs() {
   static const std::vector<ParamSpec> specs = {
-#define LW_X(id, label, group, type, def, mn, mx, choices) {#id, label, group, PType::type, double(def), double(mn), double(mx), choices},
-    LW_PARAM_LIST(LW_X)
-#undef LW_X
+#define AK_X(id, label, group, type, def, mn, mx, choices) {#id, label, group, PType::type, double(def), double(mn), double(mx), choices},
+    AK_PARAM_LIST(AK_X)
+#undef AK_X
   };
   return specs;
 }
@@ -22,10 +22,10 @@ const ParamSpec* findSpec(const std::string& id) {
 }
 
 bool Params::set(const std::string& key, double v) {
-#define LW_X(id, label, group, type, def, mn, mx, choices) \
+#define AK_X(id, label, group, type, def, mn, mx, choices) \
   if (key == #id) { id = std::clamp(v, double(mn), double(mx)); return true; }
-  LW_PARAM_LIST(LW_X)
-#undef LW_X
+  AK_PARAM_LIST(AK_X)
+#undef AK_X
   return false;
 }
 
@@ -51,4 +51,4 @@ bool setFromText(Params& p, const std::string& key, const std::string& value) {
   return p.set(key, d);
 }
 
-} // namespace lw
+} // namespace ak

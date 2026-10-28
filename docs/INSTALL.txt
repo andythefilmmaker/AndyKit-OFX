@@ -1,9 +1,9 @@
-LINEWORK — OpenFX plugin for DaVinci Resolve Studio
+ANDYKIT — OpenFX plugin for DaVinci Resolve Studio
 ====================================================
 
 1. Close DaVinci Resolve.
 
-2. Copy the folder "Linework.ofx.bundle" here:
+2. Copy the folder "AndyKit.ofx.bundle" here:
 
    macOS    /Library/OFX/Plugins/
    Windows  C:\Program Files\Common Files\OFX\Plugins\
@@ -14,9 +14,9 @@ LINEWORK — OpenFX plugin for DaVinci Resolve Studio
 3. macOS only — the plugin is not notarized, so remove the download quarantine
    once, in Terminal:
 
-   sudo xattr -dr com.apple.quarantine /Library/OFX/Plugins/Linework.ofx.bundle
+   sudo xattr -dr com.apple.quarantine /Library/OFX/Plugins/AndyKit.ofx.bundle
 
-4. Open Resolve. In the Effects library: OpenFX > Filters > ANDYTHEFILMMAKER > Linework.
+4. Open Resolve. In the Effects library: OpenFX > Filters > ANDYTHEFILMMAKER > AndyKit.
    Drag it onto a clip (Edit page) or a node (Color page).
 
 5. Pick a look in "Presets > Preset" and press "Apply Preset".
@@ -29,11 +29,11 @@ renders the same whether you play, scrub or render. Lower the warm-up for faster
 ITALIANO
 
 1. Chiudi DaVinci Resolve.
-2. Copia la cartella "Linework.ofx.bundle" in:
+2. Copia la cartella "AndyKit.ofx.bundle" in:
    macOS    /Library/OFX/Plugins/
    Windows  C:\Program Files\Common Files\OFX\Plugins\
    Linux    /usr/OFX/Plugins/
 3. Solo macOS, una volta sola, nel Terminale:
-   sudo xattr -dr com.apple.quarantine /Library/OFX/Plugins/Linework.ofx.bundle
-4. Apri Resolve: Effects > OpenFX > Filters > ANDYTHEFILMMAKER > Linework.
+   sudo xattr -dr com.apple.quarantine /Library/OFX/Plugins/AndyKit.ofx.bundle
+4. Apri Resolve: Effects > OpenFX > Filters > ANDYTHEFILMMAKER > AndyKit.
 5. Scegli un look in "Presets > Preset" e premi "Apply Preset".

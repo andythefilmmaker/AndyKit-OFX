@@ -1,4 +1,4 @@
-// Linework — host-independent rendering engine.
+// AndyKit — host-independent rendering engine.
 // SPDX-License-Identifier: MIT
 #include "Engine.h"
 #include "Font5x7.h"
@@ -11,7 +11,7 @@
 #include <thread>
 #include <unordered_map>
 
-namespace lw {
+namespace ak {
 namespace {
 
 constexpr float kPi = 3.14159265358979f;
@@ -934,4 +934,4 @@ void render(Image& img, const Analysis& current, const std::vector<HistoryFrame>
   drawFrame(c);
 }
 
-} // namespace lw
+} // namespace ak
