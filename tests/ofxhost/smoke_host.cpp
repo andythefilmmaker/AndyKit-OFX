@@ -41,14 +41,16 @@ int main(int argc, char** argv) {
   if (argc < 4) { std::cerr << "usage: smoke_host <plugin-dir> <input.png> <out-prefix> [--frames N] [--preset i] [k=v ...]\n"; return 2; }
   std::string pluginDir = argv[1], input = argv[2], prefix = argv[3];
   int frames = 3, preset = -1, start = 0;
+  std::vector<std::string> presses;
   for (int i = 4; i < argc; ++i) {
     std::string a = argv[i];
     if (a == "--frames" && i + 1 < argc) frames = std::atoi(argv[++i]);
     else if (a == "--preset" && i + 1 < argc) preset = std::atoi(argv[++i]);
     else if (a == "--start" && i + 1 < argc) start = std::atoi(argv[++i]);
+    else if (a == "--press" && i + 1 < argc) presses.push_back(argv[++i]);
     else if (auto eq = a.find('='); eq != std::string::npos) MyHost::paramOverrides()[a.substr(0, eq)] = a.substr(eq + 1);
   }
-  if (preset >= 0) MyHost::paramOverrides()["akPreset"] = std::to_string(preset);
+  if (preset >= 0) { MyHost::paramOverrides()["akPreset"] = std::to_string(preset); presses.insert(presses.begin(), "akPresetApply"); }
 
   int w, h, n;
   unsigned char* data = stbi_load(input.c_str(), &w, &h, &n, 4);
@@ -78,12 +80,12 @@ int main(int argc, char** argv) {
   if (!inst->getClipPreferences()) return fail("getClipPreferences");
 
   OfxPointD scale{1.0, 1.0};
-  if (preset >= 0) { // press "Apply Preset" like a user would
+  for (const auto& button : presses) { // press buttons like a user would
     inst->beginInstanceChangedAction(kOfxChangeUserEdited);
-    st = inst->paramInstanceChangedAction("akPresetApply", kOfxChangeUserEdited, 0, scale);
+    st = inst->paramInstanceChangedAction(button, kOfxChangeUserEdited, 0, scale);
     inst->endInstanceChangedAction(kOfxChangeUserEdited);
-    if (st != kOfxStatOK && st != kOfxStatReplyDefault) return fail("apply preset");
-    std::cout << "preset " << preset << " applied" << std::endl;
+    if (st != kOfxStatOK && st != kOfxStatReplyDefault) return fail("press " + button);
+    std::cout << "pressed " << button << std::endl;
   }
 
   OfxRectI rw{0, 0, w, h};

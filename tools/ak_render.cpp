@@ -1,7 +1,7 @@
 // ak_render — renders AndyKit on still images or image sequences without a host.
 // Used for development and CI checks.
 //
-//   ak_render <input> <output.png> [--preset "Andy Lines"] [--frames N] [--fps 25] [key=value ...]
+//   ak_render <input> <output.png> [--preset "Demo - Lines"] [--preset-file my.andykit] [--save-preset out.andykit] [--frames N] [--fps 25] [key=value ...]
 //
 // With --frames N the same input is rendered as N frames of a still (motion, memory and
 // rhythm evolve over time) and written as output_0000.png ... output_NNNN.png.
@@ -25,7 +25,7 @@ static float toLinearish(unsigned char v) { return v / 255.f; } // the engine wo
 
 int main(int argc, char** argv) {
   if (argc < 3) {
-    std::fprintf(stderr, "usage: %s <input> <output.png> [--preset name] [--frames N] [--fps F] [key=value ...]\n", argv[0]);
+    std::fprintf(stderr, "usage: %s <input> <output.png> [--preset name] [--preset-file f.andykit] [--save-preset f.andykit] [--frames N] [--fps F] [key=value ...]\n", argv[0]);
     std::fprintf(stderr, "presets:");
     for (auto& p : ak::builtinPresets()) std::fprintf(stderr, " \"%s\"", p.name.c_str());
     std::fprintf(stderr, "\n");
@@ -36,6 +36,7 @@ int main(int argc, char** argv) {
   double fps = 25;
   ak::Params params;
   std::vector<std::pair<std::string, std::string>> overrides;
+  std::string savePath;
   for (int i = 3; i < argc; ++i) {
     std::string a = argv[i];
     if (a == "--preset" && i + 1 < argc) {
@@ -44,13 +45,23 @@ int main(int argc, char** argv) {
       for (size_t k = 0; k < ak::builtinPresets().size(); ++k)
         if (ak::builtinPresets()[k].name == name) { params = ak::presetParams(k); found = true; }
       if (!found) { std::fprintf(stderr, "unknown preset: %s\n", name.c_str()); return 1; }
-    } else if (a == "--frames" && i + 1 < argc) frames = std::max(1, std::atoi(argv[++i]));
+    } else if (a == "--preset-file" && i + 1 < argc) {
+      std::string err;
+      if (!ak::loadPresetFile(argv[++i], params, nullptr, &err)) { std::fprintf(stderr, "preset file: %s\n", err.c_str()); return 1; }
+    } else if (a == "--save-preset" && i + 1 < argc) savePath = argv[++i];
+    else if (a == "--frames" && i + 1 < argc) frames = std::max(1, std::atoi(argv[++i]));
     else if (a == "--fps" && i + 1 < argc) fps = std::atof(argv[++i]);
     else if (auto eq = a.find('='); eq != std::string::npos) overrides.push_back({a.substr(0, eq), a.substr(eq + 1)});
     else { std::fprintf(stderr, "unknown argument: %s\n", a.c_str()); return 1; }
   }
   for (auto& kv : overrides)
     if (!ak::setFromText(params, kv.first, kv.second)) { std::fprintf(stderr, "bad parameter: %s=%s\n", kv.first.c_str(), kv.second.c_str()); return 1; }
+
+  if (!savePath.empty()) {
+    std::string err;
+    if (!ak::savePresetFile(savePath, params, "CLI preset", &err)) { std::fprintf(stderr, "save: %s\n", err.c_str()); return 1; }
+    std::printf("saved preset %s\n", savePath.c_str());
+  }
 
   int w, h, n;
   unsigned char* data = stbi_load(in.c_str(), &w, &h, &n, 4);

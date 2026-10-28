@@ -4,7 +4,7 @@
 
 ![AndyKit looks](docs/preview.jpg)
 
-*Andy Lines · Andy Lines Gray · Andy Circles · Andy Dither*
+*The four demo looks: Lines · Lines Gray · Circles · Dither*
 
 - Works on the **Edit** page (as a clip effect) and the **Color** page (as a node).
 - **macOS** (Apple Silicon + Intel), **Windows** and **Linux** builds from every release.
@@ -25,11 +25,40 @@ On macOS run once: `sudo xattr -dr com.apple.quarantine /Library/OFX/Plugins/And
 
 In Resolve: **Effects → OpenFX → Filters → ANDYTHEFILMMAKER → AndyKit**.
 
+## Presets — save your own looks as files
+
+The four built-in looks are **demos**: starting points to learn the controls, not finished styles.
+
+Your own looks are plain-text **`.andykit`** files you can keep anywhere — in your project, in an `#ASSETS` folder, on a shared drive — instead of duplicating clips or effects in Resolve:
+
+1. Set the effect the way you like it.
+2. In **Presets** type a **Preset Name**, optionally a **Preset File** path, and press **Save Preset to File**.
+   With no path, the file goes to `Documents/AndyKit Presets/`.
+3. To reuse it: put the path in **Preset File** and press **Load Preset from File**.
+
+Every `.andykit` file inside `Documents/AndyKit Presets/` (sub-folders too) also appears in the **Preset** menu, marked `*`, the next time Resolve starts. The files are readable and editable by hand:
+
+```
+format = andykit-preset
+version = 1
+name = Club Night
+density = 80
+colorMode = Hybrid
+pixelMemory = true
+...
+```
+
+Missing parameters fall back to defaults, so presets keep working when new controls are added.
+
+## Section switches
+
+Every section starts with an **Enable** checkbox (Points, Connections, Motion, Subject Focus, Pixel Memory, Texture, Contours, Grid, Dither, Beat Pulse). Turning one off removes that layer and greys out its controls — handy for building a look one layer at a time.
+
 ## What it does
 
 | Group | Controls |
 |---|---|
-| **Presets** | Built-in looks + *Apply Preset*, frame title |
+| **Presets** | Demo looks + your `.andykit` presets, Apply, Save / Load preset file |
 | **General** | Seed, colour mode (source / palette / mono / duotone / hybrid), 8 palettes, 12 blend modes, source & overlay opacity, artwork frame, labels |
 | **Motion** | Glitch, drift, pulse, orbit — amount and speed |
 | **Points** | Density, edge threshold, point radius, node shapes (bracket, square, circle, cross, diamond, mixed), size range, hierarchy, variation, halo circles |
@@ -56,7 +85,7 @@ macOS universal: add `-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"`.
 
 ```sh
 # render the engine on a still (12 frames so motion and memory evolve)
-./build/ak_render tests/assets/portrait.png out.png --preset "Andy Circles" --frames 12 density=80
+./build/ak_render tests/assets/portrait.png out.png --preset "Demo - Circles" --frames 12 density=80 --save-preset my.andykit
 
 # load the real plugin bundle in a minimal OpenFX host (needs expat): -DAK_BUILD_TESTS=ON
 ./build/smoke_host build/bundle tests/assets/portrait.png out --frames 4 --preset 2

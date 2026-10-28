@@ -29,7 +29,7 @@ jobs:
       - name: Engine render test
         run: |
           mkdir -p test-out
-          for p in "Default" "Andy Lines" "Andy Lines Gray" "Andy Circles" "Andy Dither"; do
+          for p in "Default" "Demo - Lines" "Demo - Lines Gray" "Demo - Circles" "Demo - Dither"; do
             ./build/ak_render tests/assets/portrait.png "test-out/$(echo $p | tr ' ' '_').png" --preset "$p" --frames 3
           done
       - name: OpenFX host smoke test
@@ -39,6 +39,16 @@ jobs:
           for i in 1 2 3 4; do ../build/smoke_host ../build/bundle ../tests/assets/portrait.png preset$i --frames 2 --preset $i; done
           ../build/smoke_host ../build/bundle ../tests/assets/portrait.png random --frames 1 --start 3
           cmp host_3.png random_3.png && echo "random access matches sequential render"
+      - name: Preset files (save, load, presets folder)
+        run: |
+          cd test-out
+          export HOME=$PWD/home
+          ../build/smoke_host ../build/bundle ../tests/assets/portrait.png saved --frames 2 density=80 "akPresetName=CI Look" --press akPresetSave
+          test -f "home/Documents/AndyKit Presets/CI Look.andykit"
+          ../build/smoke_host ../build/bundle ../tests/assets/portrait.png loaded --frames 2 "akPresetFile=$HOME/Documents/AndyKit Presets/CI Look.andykit" --press akPresetLoad
+          cmp saved_1.png loaded_1.png && echo "preset file round-trip OK"
+          ../build/smoke_host ../build/bundle ../tests/assets/portrait.png menu --frames 2 --preset 5
+          cmp saved_1.png menu_1.png && echo "presets folder appears in the menu"
       - name: Package
         run: |
           cp docs/INSTALL.txt build/bundle/
@@ -66,7 +76,7 @@ jobs:
           codesign --force --deep --sign - build/bundle/AndyKit.ofx.bundle
           codesign --verify --verbose build/bundle/AndyKit.ofx.bundle
       - name: Engine render test
-        run: ./build/ak_render tests/assets/portrait.png mac.png --preset "Andy Lines" --frames 2
+        run: ./build/ak_render tests/assets/portrait.png mac.png --preset "Demo - Lines" --frames 2
       - name: Package
         run: |
           cp docs/INSTALL.txt build/bundle/
@@ -85,7 +95,7 @@ jobs:
       - name: Build
         run: cmake --build build --config Release -j4
       - name: Engine render test
-        run: .\build\Release\ak_render.exe tests\assets\portrait.png win.png --preset "Andy Lines" --frames 2
+        run: .\build\Release\ak_render.exe tests\assets\portrait.png win.png --preset "Demo - Lines" --frames 2
       - name: Package
         shell: pwsh
         run: |

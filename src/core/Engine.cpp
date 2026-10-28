@@ -285,7 +285,8 @@ void computeFocus(Ctx& c) {
 
 void preparePoints(Ctx& c) {
   const Params& p = c.p;
-  int mode = int(p.colorMode), motion = int(p.motionMode), focus = int(p.objectFocus);
+  int mode = int(p.colorMode), motion = p.motionEnable >= 0.5 ? int(p.motionMode) : 0;
+  int focus = p.subjectEnable >= 0.5 ? int(p.objectFocus) : 2;
   const auto& P = palette(int(p.palette));
   float mo = float(p.motionAmount / 100), sp = float(p.motionSpeed / 100);
   float str = float(p.objectStrength / 100), kf = lerpf(2.2f, 1.0f, float(p.objectConfidence / 100));
@@ -341,7 +342,7 @@ Col mixCol(const Col& a, const Col& b) { return {(a.r + b.r) / 2, (a.g + b.g) / 
 void drawConnections(Ctx& c) {
   const Params& p = c.p;
   int mode = int(p.connectionMode);
-  if (mode == 4 || p.connection <= 0 || c.pts.size() < 2) return;
+  if (p.connectionsEnable < 0.5 || mode == 4 || p.connection <= 0 || c.pts.size() < 2) return;
   float conn = float(p.connection / 100);
   float R = c.cellPx * lerpf(1.3f, 3.6f, conn);
   int maxL = p.connection > 133 ? 4 : p.connection > 66 ? 3 : p.connection > 33 ? 2 : 1;
@@ -414,6 +415,7 @@ void primitive(Image& im, int mode, float x, float y, float s, float w, const Co
 
 void drawNodes(Ctx& c) {
   const Params& p = c.p;
+  if (p.pointsEnable < 0.5) return;
   float pr = float(p.pointRadius) * c.unit * (1 + c.E.bass * 0.35f);
   if (pr > 0)
     for (auto& q : c.pts) if (q.fa >= 0.03f) disc(c.ov, q.px, q.py, pr * q.pulse, q.col, q.fa * 0.95f);
@@ -431,7 +433,7 @@ void drawNodes(Ctx& c) {
     float rank = float(k) / n, base = fs * q->m + (1 - fs) * 0.5f, hier = std::pow(1 - rank, 1 + hi * 3);
     float mix = base * (1 - hi) + hier * hi + (q->rnd - 0.5f) * sv;
     float sz = (float(p.shapeMin) + (smax - float(p.shapeMin)) * clampf(mix)) * c.unit;
-    if (p.objectFocus == 0) sz *= 1 + q->fw * str * 0.35f;
+    if (p.subjectEnable >= 0.5 && p.objectFocus == 0) sz *= 1 + q->fw * str * 0.35f;
     q->size = sz * (1 + c.E.bass * 0.35f) * q->pulse;
   }
   float sw = float(p.shapeStroke) * c.unit;
@@ -769,7 +771,7 @@ void drawMemory(Ctx& c, const std::vector<HistoryFrame>& history) {
 // ---------- post ----------
 void glitchSlices(Ctx& c) {
   const Params& p = c.p;
-  if (int(p.motionMode) != 1) return;
+  if (p.motionEnable < 0.5 || int(p.motionMode) != 1) return;
   float mo = float(p.motionAmount / 100), sp = float(p.motionSpeed / 100);
   int64_t tick = int64_t(std::floor(c.info.seconds / lerpf(0.42f, 0.045f, sp)));
   if (hash01(tick, 21, c.seed) > mo * 0.5f + c.E.high * 0.5f) return;
@@ -808,6 +810,7 @@ void glitchSlices(Ctx& c) {
 
 void textures(Ctx& c) {
   const Params& p = c.p;
+  if (p.textureEnable < 0.5) return;
   float scan = float(p.scanlines / 100) * 0.7f, grain = float(p.grain / 100) * 0.6f;
   if (scan <= 0 && grain <= 0) return;
   int period = std::max(2, int(std::lround(3 * c.unit))), dark = std::max(1, period / 3);

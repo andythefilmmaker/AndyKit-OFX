@@ -12,6 +12,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #define kPluginName        "AndyKit"
 #define kPluginGrouping    "ANDYTHEFILMMAKER"
@@ -19,16 +20,34 @@
 #define kPluginIdentifier  "com.andythefilmmaker.andykit"
 #ifndef AK_VERSION_MAJOR
 #define AK_VERSION_MAJOR 0
-#define AK_VERSION_MINOR 1
+#define AK_VERSION_MINOR 2
 #endif
 
 #define kParamPresetChoice "akPreset"
 #define kParamPresetApply  "akPresetApply"
+#define kParamPresetName   "akPresetName"
+#define kParamPresetFile   "akPresetFile"
+#define kParamPresetSave   "akPresetSave"
+#define kParamPresetLoad   "akPresetLoad"
 #define kParamTitle        "akTitle"
 
 using namespace OFX;
 
 namespace {
+
+// Entries of the preset menu: built-in demos, then the .andykit files found in the presets
+// folder when the plugin was loaded. Frozen once so menu indices stay stable for the session.
+struct MenuEntry { std::string label; int builtin; std::string path; };
+const std::vector<MenuEntry>& presetMenu() {
+  static std::vector<MenuEntry> menu;
+  static std::once_flag once;
+  std::call_once(once, [] {
+    const auto& b = ak::builtinPresets();
+    for (size_t i = 0; i < b.size(); ++i) menu.push_back({b[i].name, int(i), ""});
+    for (const auto& u : ak::scanPresetFolder(ak::defaultPresetFolder())) menu.push_back({"* " + u.name, -1, u.path});
+  });
+  return menu;
+}
 
 // Analyses of source frames, reused across renders (pixel memory replays earlier frames).
 class AnalysisCache {
@@ -71,6 +90,8 @@ bool toEngineImage(const Image& src, ak::Image& out) {
   return true;
 }
 
+bool endsWith(const std::string& s, const std::string& e) { return s.size() >= e.size() && s.compare(s.size() - e.size(), e.size(), e) == 0; }
+
 } // namespace
 
 class AndyKitPlugin : public ImageEffect {
@@ -79,15 +100,20 @@ class AndyKitPlugin : public ImageEffect {
     dstClip_ = fetchClip(kOfxImageEffectOutputClipName);
     srcClip_ = getContext() == eContextGenerator ? nullptr : fetchClip(kOfxImageEffectSimpleSourceClipName);
     presetChoice_ = fetchChoiceParam(kParamPresetChoice);
+    presetName_ = fetchStringParam(kParamPresetName);
+    presetFile_ = fetchStringParam(kParamPresetFile);
     title_ = fetchStringParam(kParamTitle);
     for (const auto& s : ak::paramSpecs()) {
+      Param* p = nullptr;
       switch (s.type) {
-        case ak::PType::Double: doubles_[s.id] = fetchDoubleParam(s.id); break;
-        case ak::PType::Int:    ints_[s.id] = fetchIntParam(s.id); break;
-        case ak::PType::Bool:   bools_[s.id] = fetchBooleanParam(s.id); break;
-        case ak::PType::Choice: choices_[s.id] = fetchChoiceParam(s.id); break;
+        case ak::PType::Double: p = doubles_[s.id] = fetchDoubleParam(s.id); break;
+        case ak::PType::Int:    p = ints_[s.id] = fetchIntParam(s.id); break;
+        case ak::PType::Bool:   p = bools_[s.id] = fetchBooleanParam(s.id); break;
+        case ak::PType::Choice: p = choices_[s.id] = fetchChoiceParam(s.id); break;
       }
+      groupParams_[s.group].push_back({s.id, p});
     }
+    for (const auto& g : groupParams_) updateGroupEnabled(g.first);
   }
 
   void render(const RenderArguments& args) override {
@@ -161,31 +187,37 @@ class AndyKitPlugin : public ImageEffect {
     if (name == kParamPresetApply) {
       int idx = 0;
       presetChoice_->getValue(idx);
-      ak::Params p = ak::presetParams(size_t(std::max(0, idx)));
-      beginEditBlock("Apply AndyKit preset");
-      for (const auto& s : ak::paramSpecs()) {
-        double v = valueOf(p, s.id);
-        switch (s.type) {
-          case ak::PType::Double: doubles_[s.id]->setValue(v); break;
-          case ak::PType::Int:    ints_[s.id]->setValue(int(std::lround(v))); break;
-          case ak::PType::Bool:   bools_[s.id]->setValue(v >= 0.5); break;
-          case ak::PType::Choice: choices_[s.id]->setValue(int(std::lround(v))); break;
-        }
+      const auto& menu = presetMenu();
+      if (idx < 0 || idx >= int(menu.size())) return;
+      const MenuEntry& e = menu[size_t(idx)];
+      if (e.builtin >= 0) {
+        applyParams(ak::presetParams(size_t(e.builtin)), "Apply AndyKit preset");
+        presetName_->setValue(e.label);
+      } else {
+        loadFromFile(e.path);
       }
-      endEditBlock();
+      return;
+    }
+    if (name == kParamPresetSave) { saveToFile(args.time); return; }
+    if (name == kParamPresetLoad) {
+      std::string path;
+      presetFile_->getValue(path);
+      if (path.empty()) {
+        sendMessage(Message::eMessageError, "", "Choose a preset file (.andykit) in \"Preset File\" first.");
+        return;
+      }
+      loadFromFile(path);
+      return;
+    }
+    if (const ak::ParamSpec* s = ak::findSpec(name)) {
+      const ak::ParamSpec* en = ak::groupEnable(s->group);
+      if (en && name == en->id) updateGroupEnabled(s->group);
     }
   }
 
   void changedClip(const InstanceChangedArgs&, const std::string&) override { cache_.clear(); }
 
  private:
-  static double valueOf(const ak::Params& p, const std::string& id) {
-#define AK_X(pid, label, group, type, def, mn, mx, choices) if (id == #pid) return p.pid;
-    AK_PARAM_LIST(AK_X)
-#undef AK_X
-    return 0;
-  }
-
   ak::Params readParams(double t) {
     ak::Params p;
     for (auto& kv : doubles_) { double v; kv.second->getValueAtTime(t, v); p.set(kv.first, v); }
@@ -193,6 +225,59 @@ class AndyKitPlugin : public ImageEffect {
     for (auto& kv : bools_)   { bool v;   kv.second->getValueAtTime(t, v); p.set(kv.first, v ? 1 : 0); }
     for (auto& kv : choices_) { int v;    kv.second->getValueAtTime(t, v); p.set(kv.first, v); }
     return p;
+  }
+
+  void applyParams(const ak::Params& p, const char* undoName) {
+    beginEditBlock(undoName);
+    for (const auto& s : ak::paramSpecs()) {
+      double v = ak::paramValue(p, s.id);
+      switch (s.type) {
+        case ak::PType::Double: doubles_[s.id]->setValue(v); break;
+        case ak::PType::Int:    ints_[s.id]->setValue(int(std::lround(v))); break;
+        case ak::PType::Bool:   bools_[s.id]->setValue(v >= 0.5); break;
+        case ak::PType::Choice: choices_[s.id]->setValue(int(std::lround(v))); break;
+      }
+    }
+    endEditBlock();
+    for (const auto& g : groupParams_) updateGroupEnabled(g.first);
+  }
+
+  // Greys out a group's controls when its "Enable" checkbox is off.
+  void updateGroupEnabled(const std::string& group) {
+    const ak::ParamSpec* en = ak::groupEnable(group);
+    if (!en) return;
+    bool on = true;
+    bools_[en->id]->getValue(on);
+    for (auto& pp : groupParams_[group])
+      if (pp.first != en->id) pp.second->setEnabled(on);
+  }
+
+  void loadFromFile(const std::string& path) {
+    ak::Params p;
+    std::string name, err;
+    if (!ak::loadPresetFile(path, p, &name, &err)) {
+      sendMessage(Message::eMessageError, "", "AndyKit could not load the preset:\n" + err);
+      return;
+    }
+    applyParams(p, "Load AndyKit preset");
+    if (!name.empty()) presetName_->setValue(name);
+    presetFile_->setValue(path);
+  }
+
+  void saveToFile(double time) {
+    std::string name, path, err;
+    presetName_->getValue(name);
+    presetFile_->getValue(path);
+    if (name.empty()) name = "My Preset";
+    if (path.empty()) path = ak::presetFileName(ak::defaultPresetFolder(), name);
+    else if (endsWith(path, "/") || endsWith(path, "\\")) path = ak::presetFileName(path, name);
+    else if (!endsWith(path, ak::kPresetExtension)) path += ak::kPresetExtension;
+    if (!ak::savePresetFile(path, readParams(time), name, &err)) {
+      sendMessage(Message::eMessageError, "", "AndyKit could not save the preset:\n" + err);
+      return;
+    }
+    presetFile_->setValue(path);
+    sendMessage(Message::eMessageMessage, "", "Preset \"" + name + "\" saved to:\n" + path);
   }
 
   std::shared_ptr<const ak::Analysis> analysisAt(double t, const ak::Image& img) {
@@ -216,11 +301,14 @@ class AndyKitPlugin : public ImageEffect {
   Clip* dstClip_ = nullptr;
   Clip* srcClip_ = nullptr;
   ChoiceParam* presetChoice_ = nullptr;
+  StringParam* presetName_ = nullptr;
+  StringParam* presetFile_ = nullptr;
   StringParam* title_ = nullptr;
   std::map<std::string, DoubleParam*> doubles_;
   std::map<std::string, IntParam*> ints_;
   std::map<std::string, BooleanParam*> bools_;
   std::map<std::string, ChoiceParam*> choices_;
+  std::map<std::string, std::vector<std::pair<std::string, Param*>>> groupParams_;
   AnalysisCache cache_;
 };
 
@@ -256,31 +344,62 @@ void AndyKitPluginFactory::describeInContext(ImageEffectDescriptor& desc, Contex
 
   PageParamDescriptor* page = desc.definePageParam("Controls");
 
-  // Presets
+  // ---- Presets ----
+  const std::string folder = ak::defaultPresetFolder();
   GroupParamDescriptor* presetGroup = desc.defineGroupParam("grpPresets");
   presetGroup->setLabels("Presets", "Presets", "Presets");
+  presetGroup->setOpen(true);
   page->addChild(*presetGroup);
+
   ChoiceParamDescriptor* pc = desc.defineChoiceParam(kParamPresetChoice);
   pc->setLabels("Preset", "Preset", "Preset");
-  pc->setHint("Choose a look, then press Apply Preset.");
-  for (const auto& pr : ak::builtinPresets()) pc->appendOption(pr.name);
+  pc->setHint("Demo looks to start from, then your presets (*) found in " + folder +
+              " when Resolve started. Pick one and press Apply Preset.");
+  for (const auto& e : presetMenu()) pc->appendOption(e.label);
   pc->setDefault(0);
   pc->setAnimates(false);
   pc->setParent(*presetGroup);
   page->addChild(*pc);
+
   PushButtonParamDescriptor* pb = desc.definePushButtonParam(kParamPresetApply);
   pb->setLabels("Apply Preset", "Apply Preset", "Apply Preset");
   pb->setParent(*presetGroup);
   page->addChild(*pb);
-  StringParamDescriptor* title = desc.defineStringParam(kParamTitle);
-  title->setLabels("Frame Title", "Frame Title", "Frame Title");
-  title->setHint("Text shown in the artwork frame when Labels is on.");
-  title->setDefault("ANDYKIT");
-  title->setStringType(eStringTypeSingleLine);
-  title->setAnimates(false);
-  title->setParent(*presetGroup);
-  page->addChild(*title);
 
+  StringParamDescriptor* pn = desc.defineStringParam(kParamPresetName);
+  pn->setLabels("Preset Name", "Preset Name", "Preset Name");
+  pn->setHint("Name stored inside the preset file and shown in the menu.");
+  pn->setDefault("My Preset");
+  pn->setStringType(eStringTypeSingleLine);
+  pn->setAnimates(false);
+  pn->setParent(*presetGroup);
+  page->addChild(*pn);
+
+  StringParamDescriptor* pf = desc.defineStringParam(kParamPresetFile);
+  pf->setLabels("Preset File", "Preset File", "Preset File");
+  pf->setHint("A .andykit file anywhere on your computer (e.g. your #ASSETS folder). "
+              "Leave empty to save into " + folder + ", whose presets also appear in the menu after restarting Resolve. "
+              "You can also type a folder ending with / to save there using the preset name.");
+  pf->setDefault("");
+  pf->setStringType(eStringTypeFilePath);
+  pf->setFilePathExists(false);
+  pf->setAnimates(false);
+  pf->setParent(*presetGroup);
+  page->addChild(*pf);
+
+  PushButtonParamDescriptor* ps = desc.definePushButtonParam(kParamPresetSave);
+  ps->setLabels("Save Preset to File", "Save Preset to File", "Save Preset to File");
+  ps->setHint("Writes every current setting to the Preset File.");
+  ps->setParent(*presetGroup);
+  page->addChild(*ps);
+
+  PushButtonParamDescriptor* pl = desc.definePushButtonParam(kParamPresetLoad);
+  pl->setLabels("Load Preset from File", "Load Preset from File", "Load Preset from File");
+  pl->setHint("Reads the Preset File and applies it.");
+  pl->setParent(*presetGroup);
+  page->addChild(*pl);
+
+  // ---- effect parameters, grouped; each group starts with its Enable checkbox ----
   std::map<std::string, GroupParamDescriptor*> groups;
   for (const auto& s : ak::paramSpecs()) {
     GroupParamDescriptor*& g = groups[s.group];
@@ -291,6 +410,16 @@ void AndyKitPluginFactory::describeInContext(ImageEffectDescriptor& desc, Contex
       g->setLabels(s.group, s.group, s.group);
       g->setOpen(std::string(s.group) == "General" || std::string(s.group) == "Points");
       page->addChild(*g);
+      if (std::string(s.group) == "General") { // frame title lives with the frame/labels toggles
+        StringParamDescriptor* title = desc.defineStringParam(kParamTitle);
+        title->setLabels("Frame Title", "Frame Title", "Frame Title");
+        title->setHint("Text shown in the artwork frame when Labels is on.");
+        title->setDefault("ANDYKIT");
+        title->setStringType(eStringTypeSingleLine);
+        title->setAnimates(false);
+        title->setParent(*g);
+        page->addChild(*title);
+      }
     }
     ParamDescriptor* pd = nullptr;
     switch (s.type) {

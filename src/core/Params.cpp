@@ -21,6 +21,12 @@ const ParamSpec* findSpec(const std::string& id) {
   return nullptr;
 }
 
+const ParamSpec* groupEnable(const std::string& group) {
+  for (const auto& s : paramSpecs())
+    if (group == s.group && s.type == PType::Bool && std::string(s.label).rfind("Enable ", 0) == 0) return &s;
+  return nullptr;
+}
+
 bool Params::set(const std::string& key, double v) {
 #define AK_X(id, label, group, type, def, mn, mx, choices) \
   if (key == #id) { id = std::clamp(v, double(mn), double(mx)); return true; }
