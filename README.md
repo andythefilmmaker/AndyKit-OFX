@@ -4,7 +4,7 @@
 
 ![Linework looks](docs/preview.jpg)
 
-*Andy Lines · Andy Lines Gray · Andy Circles · Andy Geometric*
+*Andy Lines · Andy Lines Gray · Andy Circles · Andy Dither*
 
 - Works on the **Edit** page (as a clip effect) and the **Color** page (as a node).
 - **macOS** (Apple Silicon + Intel), **Windows** and **Linux** builds from every release.

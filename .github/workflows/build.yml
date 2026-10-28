@@ -29,7 +29,7 @@ jobs:
       - name: Engine render test
         run: |
           mkdir -p test-out
-          for p in "Default" "Andy Lines" "Andy Lines Gray" "Andy Circles" "Andy Geometric"; do
+          for p in "Default" "Andy Lines" "Andy Lines Gray" "Andy Circles" "Andy Dither"; do
             ./build/lw_render tests/assets/portrait.png "test-out/$(echo $p | tr ' ' '_').png" --preset "$p" --frames 3
           done
       - name: OpenFX host smoke test
