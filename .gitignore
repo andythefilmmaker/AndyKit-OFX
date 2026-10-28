@@ -1,0 +1,6 @@
+build/
+out/
+test-out/
+*.ppm
+.DS_Store
+/*.png
