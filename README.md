@@ -32,9 +32,12 @@ The four built-in looks are **demos**: starting points to learn the controls, no
 Your own looks are plain-text **`.andykit`** files you can keep anywhere — in your project, in an `#ASSETS` folder, on a shared drive — instead of duplicating clips or effects in Resolve:
 
 1. Set the effect the way you like it.
-2. In **Presets** type a **Preset Name**, optionally a **Preset File** path, and press **Save Preset to File**.
-   With no path, the file goes to `Documents/AndyKit Presets/`.
-3. To reuse it: put the path in **Preset File** and press **Load Preset from File**.
+2. Press **Save Preset…** — a normal save window opens (Finder / Explorer): pick a folder and a name.
+   It starts in `Documents/AndyKit Presets/`.
+3. To reuse it press **Load Preset…** and pick the `.andykit` file.
+
+The preset name is the file name. **Preset File** shows the last file used; on systems where the
+window can't open (e.g. a headless Linux render node) you can type a path there instead.
 
 Every `.andykit` file inside `Documents/AndyKit Presets/` (sub-folders too) also appears in the **Preset** menu, marked `*`, the next time Resolve starts. The files are readable and editable by hand:
 

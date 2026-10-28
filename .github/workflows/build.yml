@@ -43,8 +43,10 @@ jobs:
         run: |
           cd test-out
           export HOME=$PWD/home
-          ../build/smoke_host ../build/bundle ../tests/assets/portrait.png saved --frames 2 density=80 "akPresetName=CI Look" --press akPresetSave
-          test -f "home/Documents/AndyKit Presets/CI Look.andykit"
+          P="$HOME/Documents/AndyKit Presets/CI Look.andykit"
+          ../build/smoke_host ../build/bundle ../tests/assets/portrait.png saved --frames 2 density=80 "akPresetFile=$P" --press akPresetSave
+          test -f "$P"
+          ../build/smoke_host ../build/bundle ../tests/assets/portrait.png empty --frames 1 --press akPresetLoad
           ../build/smoke_host ../build/bundle ../tests/assets/portrait.png loaded --frames 2 "akPresetFile=$HOME/Documents/AndyKit Presets/CI Look.andykit" --press akPresetLoad
           cmp saved_1.png loaded_1.png && echo "preset file round-trip OK"
           ../build/smoke_host ../build/bundle ../tests/assets/portrait.png menu --frames 2 --preset 5
@@ -75,6 +77,10 @@ jobs:
           lipo -info build/bundle/AndyKit.ofx.bundle/Contents/MacOS/AndyKit.ofx
           codesign --force --deep --sign - build/bundle/AndyKit.ofx.bundle
           codesign --verify --verbose build/bundle/AndyKit.ofx.bundle
+      - name: AppleScript dialogs compile
+        run: |
+          osacompile -o /tmp/open.scpt -e 'activate' -e 'set f to choose file with prompt "Load AndyKit preset" default location (POSIX file "/Users")' -e 'POSIX path of f'
+          osacompile -o /tmp/save.scpt -e 'activate' -e 'set f to choose file name with prompt "Save AndyKit preset" default name "My Look.andykit" default location (POSIX file "/Users")' -e 'POSIX path of f'
       - name: Engine render test
         run: ./build/ak_render tests/assets/portrait.png mac.png --preset "Demo - Lines" --frames 2
       - name: Package

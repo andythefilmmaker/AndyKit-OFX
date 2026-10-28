@@ -20,7 +20,7 @@ ANDYKIT — OpenFX plugin for DaVinci Resolve Studio
    Drag it onto a clip (Edit page) or a node (Color page).
 
 5. Pick a look in "Presets > Preset" and press "Apply Preset".
-   The built-in looks are demos. Save your own with "Save Preset to File":
+   The built-in looks are demos. Save your own with "Save Preset...":
    files go to Documents/AndyKit Presets/ (or any path you type) and show up
    in the Preset menu the next time Resolve starts.
 
@@ -40,6 +40,6 @@ ITALIANO
    sudo xattr -dr com.apple.quarantine /Library/OFX/Plugins/AndyKit.ofx.bundle
 4. Apri Resolve: Effects > OpenFX > Filters > ANDYTHEFILMMAKER > AndyKit.
 5. Scegli un look in "Presets > Preset" e premi "Apply Preset".
-   I look inclusi sono demo. Salva i tuoi con "Save Preset to File": finiscono in
+   I look inclusi sono demo. Salva i tuoi con "Save Preset...": finiscono in
    Documenti/AndyKit Presets/ (o nel percorso che scrivi) e compaiono nel menu
    Preset al successivo avvio di Resolve.

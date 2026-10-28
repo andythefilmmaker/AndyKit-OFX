@@ -5,9 +5,11 @@
 
 #include "core/Engine.h"
 #include "core/Presets.h"
+#include "FileDialog.h"
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -20,12 +22,11 @@
 #define kPluginIdentifier  "com.andythefilmmaker.andykit"
 #ifndef AK_VERSION_MAJOR
 #define AK_VERSION_MAJOR 0
-#define AK_VERSION_MINOR 2
+#define AK_VERSION_MINOR 3
 #endif
 
 #define kParamPresetChoice "akPreset"
 #define kParamPresetApply  "akPresetApply"
-#define kParamPresetName   "akPresetName"
 #define kParamPresetFile   "akPresetFile"
 #define kParamPresetSave   "akPresetSave"
 #define kParamPresetLoad   "akPresetLoad"
@@ -100,7 +101,6 @@ class AndyKitPlugin : public ImageEffect {
     dstClip_ = fetchClip(kOfxImageEffectOutputClipName);
     srcClip_ = getContext() == eContextGenerator ? nullptr : fetchClip(kOfxImageEffectSimpleSourceClipName);
     presetChoice_ = fetchChoiceParam(kParamPresetChoice);
-    presetName_ = fetchStringParam(kParamPresetName);
     presetFile_ = fetchStringParam(kParamPresetFile);
     title_ = fetchStringParam(kParamTitle);
     for (const auto& s : ak::paramSpecs()) {
@@ -192,23 +192,13 @@ class AndyKitPlugin : public ImageEffect {
       const MenuEntry& e = menu[size_t(idx)];
       if (e.builtin >= 0) {
         applyParams(ak::presetParams(size_t(e.builtin)), "Apply AndyKit preset");
-        presetName_->setValue(e.label);
       } else {
         loadFromFile(e.path);
       }
       return;
     }
-    if (name == kParamPresetSave) { saveToFile(args.time); return; }
-    if (name == kParamPresetLoad) {
-      std::string path;
-      presetFile_->getValue(path);
-      if (path.empty()) {
-        sendMessage(Message::eMessageError, "", "Choose a preset file (.andykit) in \"Preset File\" first.");
-        return;
-      }
-      loadFromFile(path);
-      return;
-    }
+    if (name == kParamPresetSave) { saveWithDialog(args.time); return; }
+    if (name == kParamPresetLoad) { loadWithDialog(); return; }
     if (const ak::ParamSpec* s = ak::findSpec(name)) {
       const ak::ParamSpec* en = ak::groupEnable(s->group);
       if (en && name == en->id) updateGroupEnabled(s->group);
@@ -252,32 +242,76 @@ class AndyKitPlugin : public ImageEffect {
       if (pp.first != en->id) pp.second->setEnabled(on);
   }
 
-  void loadFromFile(const std::string& path) {
+  // Information popups only: an OpenFX "error" message makes Resolve report the effect as failed.
+  void notify(const std::string& text) {
+    try { sendMessage(Message::eMessageMessage, "", text); } catch (...) {}
+  }
+
+  static std::string stem(const std::string& path) {
+    return std::filesystem::u8path(path).stem().u8string();
+  }
+
+  // Folder the dialogs start in: where the last preset lives, otherwise Documents/AndyKit Presets.
+  std::string dialogFolder() {
+    std::string last;
+    presetFile_->getValue(last);
+    std::error_code ec;
+    if (!last.empty()) {
+      auto parent = std::filesystem::u8path(last).parent_path();
+      if (std::filesystem::is_directory(parent, ec)) return parent.u8string();
+    }
+    std::string folder = ak::defaultPresetFolder();
+    std::filesystem::create_directories(std::filesystem::u8path(folder), ec);
+    return folder;
+  }
+
+  bool loadFromFile(const std::string& path) {
     ak::Params p;
     std::string name, err;
     if (!ak::loadPresetFile(path, p, &name, &err)) {
-      sendMessage(Message::eMessageError, "", "AndyKit could not load the preset:\n" + err);
-      return;
+      notify("AndyKit could not load this preset.\n" + err + "\n\n" + path);
+      return false;
     }
     applyParams(p, "Load AndyKit preset");
-    if (!name.empty()) presetName_->setValue(name);
     presetFile_->setValue(path);
+    return true;
   }
 
-  void saveToFile(double time) {
-    std::string name, path, err;
-    presetName_->getValue(name);
+  void loadWithDialog() {
+    std::string path;
+    switch (ak::openFileDialog("Load AndyKit preset", dialogFolder(), path)) {
+      case ak::DialogResult::Cancelled: return;
+      case ak::DialogResult::Ok: loadFromFile(path); return;
+      case ak::DialogResult::Unavailable: break;
+    }
+    // No dialog on this system: use the path typed in "Preset File".
     presetFile_->getValue(path);
-    if (name.empty()) name = "My Preset";
-    if (path.empty()) path = ak::presetFileName(ak::defaultPresetFolder(), name);
-    else if (endsWith(path, "/") || endsWith(path, "\\")) path = ak::presetFileName(path, name);
+    if (path.empty()) {
+      notify("Type the path of a .andykit file in \"Preset File\", then press Load Preset again.");
+      return;
+    }
+    loadFromFile(path);
+  }
+
+  void saveWithDialog(double time) {
+    std::string last, path;
+    presetFile_->getValue(last);
+    std::string fileName = (last.empty() ? std::string("My Look") : stem(last)) + ak::kPresetExtension;
+    switch (ak::saveFileDialog("Save AndyKit preset", dialogFolder(), fileName, path)) {
+      case ak::DialogResult::Cancelled: return;
+      case ak::DialogResult::Ok: break;
+      case ak::DialogResult::Unavailable: // no dialog: save to the typed path, or to the presets folder
+        path = last.empty() ? ak::presetFileName(ak::defaultPresetFolder(), "My Look") : last;
+        break;
+    }
+    if (endsWith(path, "/") || endsWith(path, "\\")) path = ak::presetFileName(path, "My Look");
     else if (!endsWith(path, ak::kPresetExtension)) path += ak::kPresetExtension;
-    if (!ak::savePresetFile(path, readParams(time), name, &err)) {
-      sendMessage(Message::eMessageError, "", "AndyKit could not save the preset:\n" + err);
+    std::string err;
+    if (!ak::savePresetFile(path, readParams(time), stem(path), &err)) {
+      notify("AndyKit could not save the preset.\n" + err);
       return;
     }
     presetFile_->setValue(path);
-    sendMessage(Message::eMessageMessage, "", "Preset \"" + name + "\" saved to:\n" + path);
   }
 
   std::shared_ptr<const ak::Analysis> analysisAt(double t, const ak::Image& img) {
@@ -301,7 +335,6 @@ class AndyKitPlugin : public ImageEffect {
   Clip* dstClip_ = nullptr;
   Clip* srcClip_ = nullptr;
   ChoiceParam* presetChoice_ = nullptr;
-  StringParam* presetName_ = nullptr;
   StringParam* presetFile_ = nullptr;
   StringParam* title_ = nullptr;
   std::map<std::string, DoubleParam*> doubles_;
@@ -366,20 +399,23 @@ void AndyKitPluginFactory::describeInContext(ImageEffectDescriptor& desc, Contex
   pb->setParent(*presetGroup);
   page->addChild(*pb);
 
-  StringParamDescriptor* pn = desc.defineStringParam(kParamPresetName);
-  pn->setLabels("Preset Name", "Preset Name", "Preset Name");
-  pn->setHint("Name stored inside the preset file and shown in the menu.");
-  pn->setDefault("My Preset");
-  pn->setStringType(eStringTypeSingleLine);
-  pn->setAnimates(false);
-  pn->setParent(*presetGroup);
-  page->addChild(*pn);
+  PushButtonParamDescriptor* ps = desc.definePushButtonParam(kParamPresetSave);
+  ps->setLabels("Save Preset...", "Save Preset...", "Save Preset...");
+  ps->setHint("Opens a save window: store every current setting as a .andykit file anywhere, e.g. your #ASSETS folder.");
+  ps->setParent(*presetGroup);
+  page->addChild(*ps);
+
+  PushButtonParamDescriptor* pl = desc.definePushButtonParam(kParamPresetLoad);
+  pl->setLabels("Load Preset...", "Load Preset...", "Load Preset...");
+  pl->setHint("Opens a file window: pick a .andykit preset and apply it.");
+  pl->setParent(*presetGroup);
+  page->addChild(*pl);
 
   StringParamDescriptor* pf = desc.defineStringParam(kParamPresetFile);
   pf->setLabels("Preset File", "Preset File", "Preset File");
-  pf->setHint("A .andykit file anywhere on your computer (e.g. your #ASSETS folder). "
-              "Leave empty to save into " + folder + ", whose presets also appear in the menu after restarting Resolve. "
-              "You can also type a folder ending with / to save there using the preset name.");
+  pf->setHint("The last preset saved or loaded. Presets saved in " + folder +
+              " also appear in the Preset menu after restarting Resolve. If the file browser can't open on this "
+              "system, type a path here and use Save / Load.");
   pf->setDefault("");
   pf->setStringType(eStringTypeFilePath);
   pf->setFilePathExists(false);
@@ -387,17 +423,6 @@ void AndyKitPluginFactory::describeInContext(ImageEffectDescriptor& desc, Contex
   pf->setParent(*presetGroup);
   page->addChild(*pf);
 
-  PushButtonParamDescriptor* ps = desc.definePushButtonParam(kParamPresetSave);
-  ps->setLabels("Save Preset to File", "Save Preset to File", "Save Preset to File");
-  ps->setHint("Writes every current setting to the Preset File.");
-  ps->setParent(*presetGroup);
-  page->addChild(*ps);
-
-  PushButtonParamDescriptor* pl = desc.definePushButtonParam(kParamPresetLoad);
-  pl->setLabels("Load Preset from File", "Load Preset from File", "Load Preset from File");
-  pl->setHint("Reads the Preset File and applies it.");
-  pl->setParent(*presetGroup);
-  page->addChild(*pl);
 
   // ---- effect parameters, grouped; each group starts with its Enable checkbox ----
   std::map<std::string, GroupParamDescriptor*> groups;
